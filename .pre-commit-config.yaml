@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.82.0
+    rev: v1.83.0
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
@@ -27,8 +27,6 @@ repos:
     hooks:
       - id: check-merge-conflict
       - id: end-of-file-fixer
-
-
   - repo: https://github.com/qoomon/git-conventional-commits
     rev: v2.6.5
     hooks:

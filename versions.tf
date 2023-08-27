@@ -1,27 +1,22 @@
 terraform {
-
-  required_version = ">= 1.0"
+  required_version = ">= 1.5"
 
   required_providers {
     vault = {
       source  = "hashicorp/vault"
-      version = ">= 3.15.2"
+      version = ">= 3.0"
     }
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.9.0"
+      version = ">= 4.0"
     }
     archive = {
       source  = "hashicorp/archive"
-      version = ">= 2.4.0"
+      version = ">= 2.0"
     }
     null = {
       source  = "hashicorp/null"
-      version = ">= 3.2"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = ">= 3.0"
+      version = ">= 2.0"
     }
   }
 }

@@ -1,44 +1,96 @@
 locals {
   kv_path = "kv"
 }
-#provider "random" {}
+
 provider "vault" {
   address = var.vault_url
 }
 
 provider "aws" {
-  region                      = "us-west-2"
+  region = "us-west-2"
+
   skip_credentials_validation = true
   skip_metadata_api_check     = true
   skip_region_validation      = true
-  skip_requesting_account_id  = true
+
   default_tags {
     tags = {
-      project   = "examples/complete"
-      terraform = "True"
+      Name       = "ex-${basename(path.cwd)}"
+      Example    = "complete"
+      Repository = "github.com/99/terraform-vault-s3-backup"
     }
   }
 }
 
+###############################################
+# S3 bucket and KMS key created by this module
+###############################################
 module "vault_kv_backup" {
-  source = "../.."
+  source = "../../"
 
   kv_path     = local.kv_path
-  bucket_name = random_pet.default.id
+  bucket_name = random_pet.this.id
 
-  create_kms = true
+  # Allow deletion of non-empty bucket (can be helpful for tests)
+  bucket_force_destroy = true
+}
+
+#######################################################
+# S3 bucket and KMS key created outside of this module
+#######################################################
+module "vault_kv_backup_external" {
+  source = "../../"
+
+  kv_path = local.kv_path
+
+  create_bucket = false
+  bucket_name   = module.s3_bucket.s3_bucket_id
+
+  create_kms = false
+  kms_key_id = module.kms.key_id
+
+  # Allow deletion of non-empty bucket (can be helpful for tests)
+  bucket_force_destroy = true
+}
+
+###########
+# Disabled
+###########
+module "disabled" {
+  source = "../../"
+
+  create = false
 }
 
 #######################
 # Additional resources
 #######################
-resource "random_pet" "default" {
+resource "random_pet" "this" {
+  length = 2
 }
 
+#####################
+# External resources
+#####################
+module "s3_bucket" {
+  source  = "terraform-aws-modules/s3-bucket/aws"
+  version = "~> 3.0"
+
+  bucket        = "${random_pet.this.id}-vault-backups"
+  force_destroy = true
+}
+
+module "kms" {
+  source  = "terraform-aws-modules/kms/aws"
+  version = "~> 1.0"
+}
+
+##################
+# Vault bootstrap
+##################
 resource "vault_policy" "vault_kv_backup_executor" {
   name   = "vault_kv_backup_executor"
   policy = <<EOT
-
 path "${local.kv_path}/*" {
   capabilities = ["read", "list", "create"]
 }
