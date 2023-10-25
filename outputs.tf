@@ -9,6 +9,6 @@ output "s3_bucket_id" {
 }
 
 output "backup_zip" {
-  description = "Filename of zip-archive"
-  value       = try(data.archive_file.zip[0].output_path, null)
+  description = "Filenames of zip-archive"
+  value       = try(data.archive_file.zip[*].output_path, null)
 }

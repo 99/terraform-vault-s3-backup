@@ -2,29 +2,37 @@ locals {
   s3_bucket_id = try(data.aws_s3_bucket.this[0].id, module.s3_bucket.s3_bucket_id, "")
   kms_key_arn  = try(data.aws_kms_key.this[0].arn, module.kms.key_arn, "")
   kms_key_id   = try(data.aws_kms_key.this[0].key_id, module.kms.key_id, "")
+  paths_to_check = var.kv_paths
+
+  nested_paths = [for k, v in data.vault_kv_secrets_list.kv : k if length(v.names) == 0]
+
+  final_secrets_paths = setsubtract(local.paths_to_check, local.nested_paths)
+  
+  kv_secrets = flatten([for k in local.final_secrets_paths : 
+                [for secret_v in nonsensitive(data.vault_kv_secrets_list.kv[k].names): "${k}/${secret_v}"]])
 }
 
 ########
 # Vault
 ########
 data "vault_kv_secrets_list" "kv" {
-  count = var.create ? 1 : 0
-
-  path = var.kv_path
+  for_each = { for k in local.paths_to_check : k => k if var.create }
+ 
+  path = each.key
 }
 
 data "vault_kv_secret" "secrets" {
-  for_each = try(nonsensitive(toset(data.vault_kv_secrets_list.kv[0].names)), {})
-
-  path = "${var.kv_path}/${each.value}"
+  for_each = toset(local.kv_secrets)
+  
+  path = each.value
 }
 
 data "archive_file" "zip" {
-  count = var.create ? 1 : 0
+  for_each = toset(local.kv_secrets)
 
   type = "zip"
 
-  output_path = "${path.root}/${formatdate("YY_MM_DD", plantimestamp())}.zip"
+  output_path = "${path.root}/${formatdate("YY_MM_DD", plantimestamp())}/${each.key}.zip"
 
   dynamic "source" {
     for_each = data.vault_kv_secret.secrets
@@ -37,11 +45,11 @@ data "archive_file" "zip" {
 }
 
 resource "aws_s3_object" "backup" {
-  count = var.create ? 1 : 0
+  for_each = toset(local.kv_secrets)
 
-  key        = data.archive_file.zip[0].output_path
+  key        = data.archive_file.zip[each.key].output_path
   bucket     = local.s3_bucket_id
-  source     = data.archive_file.zip[0].output_path
+  source     = data.archive_file.zip[each.key].output_path
   kms_key_id = local.kms_key_arn
 
   tags = var.s3_object_tags
@@ -118,14 +126,14 @@ module "kms" {
 }
 
 resource "null_resource" "remove_zip" {
-  count = var.create && var.remove_zip_locally ? 1 : 0
+  for_each = toset([for v in local.kv_secrets : v if var.create && var.remove_zip_locally ])
 
   triggers = {
-    archive_md5 = data.archive_file.zip[0].output_md5
+    archive_md5 = data.archive_file.zip[each.key].output_md5
   }
 
   provisioner "local-exec" {
-    command = "rm -rf ${data.archive_file.zip[0].output_path}"
+    command = "rm -rf ${data.archive_file.zip[each.key].output_path}"
   }
 
   # Delete zip-archive after it is uploaded to S3 bucket

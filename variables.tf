@@ -36,10 +36,10 @@ variable "tags" {
 }
 
 # Vault
-variable "kv_path" {
-  description = "key value secret engine mount point"
-  type        = string
-  default     = ""
+variable "kv_paths" {
+  description = "List of keys value secret engines"
+  type        = list(string)
+  default     = []
 }
 
 # S3 bucket
