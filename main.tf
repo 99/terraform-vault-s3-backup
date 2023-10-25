@@ -22,7 +22,7 @@ data "vault_kv_secrets_list" "kv" {
 }
 
 data "vault_kv_secret" "secrets" {
-  for_each = toset(local.kv_secrets)
+  for_each = toset(nonsensitive(local.kv_secrets))
   
   path = each.value
 }
